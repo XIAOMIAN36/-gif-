@@ -12,17 +12,30 @@ const loadImage = (url: string): Promise<HTMLImageElement> => {
 };
 
 // Helper to create a Worker Blob URL that works across domains (CORS Fix)
-const getWorkerBlobUrl = (): string => {
-  // We create a tiny worker script that imports the actual logic from CDN.
-  const workerCode = `
-    try {
-      importScripts('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js');
-    } catch (e) {
-      console.error('Worker failed to load script', e);
-    }
-  `;
-  const blob = new Blob([workerCode], { type: 'application/javascript' });
-  return URL.createObjectURL(blob);
+const getWorkerBlobUrl = async (): Promise<string> => {
+  try {
+    // Try fetching the worker script text directly to inline it.
+    // This solves issues where `importScripts` inside a blob worker (null origin)
+    // is blocked by CORS or strict security policies on some domains/local files.
+    const response = await fetch('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js');
+    if (!response.ok) throw new Error('Network response was not ok');
+    const workerCode = await response.text();
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    return URL.createObjectURL(blob);
+  } catch (e) {
+    console.warn('Failed to fetch worker script, falling back to importScripts', e);
+    // Fallback: Create a tiny worker script that imports the logic from CDN.
+    // This is the traditional method but may fail in strict CORS/offline environments.
+    const workerCode = `
+      try {
+        importScripts('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js');
+      } catch (e) {
+        console.error('Worker failed to load script', e);
+      }
+    `;
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    return URL.createObjectURL(blob);
+  }
 };
 
 /**
@@ -151,7 +164,8 @@ export const generateGif = async (
   };
 
   // --- 4. Setup GIF Encoder ---
-  const workerScriptUrl = getWorkerBlobUrl();
+  // Await the worker blob creation
+  const workerScriptUrl = await getWorkerBlobUrl();
   const concurrency = navigator.hardwareConcurrency || 4;
   
   const gif = new window.GIF({
