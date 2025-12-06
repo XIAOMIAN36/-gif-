@@ -1,4 +1,3 @@
-
 export type AnimationMode = 'blink' | 'slider';
 
 export interface ElementPosition {
@@ -50,5 +49,8 @@ declare global {
     addFrame(imageElement: HTMLImageElement | HTMLCanvasElement | CanvasRenderingContext2D, options?: any): void;
     on(event: string, callback: (args?: any) => void): void;
     render(): void;
+  }
+  interface Window {
+    GIF: typeof GIF;
   }
 }

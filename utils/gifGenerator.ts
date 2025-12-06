@@ -14,8 +14,6 @@ const loadImage = (url: string): Promise<HTMLImageElement> => {
 // Helper to create a Worker Blob URL that works across domains (CORS Fix)
 const getWorkerBlobUrl = (): string => {
   // We create a tiny worker script that imports the actual logic from CDN.
-  // This bypasses some CORS restrictions on fetching the file directly, 
-  // relying instead on the browser's ability to importScripts.
   const workerCode = `
     try {
       importScripts('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js');
@@ -67,7 +65,7 @@ export const generateGif = async (
   const [imgA, imgB] = await Promise.all([loadImage(imageAUrl), loadImage(imageBUrl)]);
 
   // Check if GIF library is loaded
-  if (typeof (window as any).GIF === 'undefined') {
+  if (typeof window.GIF === 'undefined') {
     throw new Error('GIF library not loaded. Please refresh the page.');
   }
 
@@ -133,9 +131,9 @@ export const generateGif = async (
      contentWidth = scaledW;
      contentHeight = scaledH;
   } else {
-     // Center vertically if ratios mismatch in standard mode (shouldn't happen with updated logic but good safety)
+     // Center vertically if ratios mismatch in standard mode
      if (contentHeight > canvasHeight) {
-       // Fit to height logic could go here, but usually we fit to width
+       // Optional: fit logic
      }
   }
 
@@ -156,7 +154,7 @@ export const generateGif = async (
   const workerScriptUrl = getWorkerBlobUrl();
   const concurrency = navigator.hardwareConcurrency || 4;
   
-  const gif = new (window as any).GIF({
+  const gif = new window.GIF({
     workers: Math.min(concurrency, 8),
     quality: options.quality,
     width: canvasWidth,
@@ -166,9 +164,6 @@ export const generateGif = async (
   });
 
   // --- 5. Generate Frames ---
-  // Note: For poster mode, we draw: Background -> Image -> Text.
-  // This ensures text is ON TOP of the image if they overlap.
-  
   const drawFrame = (imgToDraw: HTMLImageElement | null, splitProgress: number | null) => {
       // 1. Draw Background (Color)
       if (options.poster?.enabled) {
@@ -207,11 +202,9 @@ export const generateGif = async (
 
       // 3. Draw Text (On Top)
       if (options.poster?.enabled) {
-          // We only draw text here, because BG was drawn at step 1
           const config = options.poster;
           const scaleFactor = canvasWidth / 1080;
           
-          // Use config sizes
           const titleSize = Math.max(10, Math.round(config.titleFontSize * scaleFactor));
           const subtitleSize = Math.max(10, Math.round(config.subtitleFontSize * scaleFactor));
           
@@ -247,18 +240,15 @@ export const generateGif = async (
     const frameDelay = 1000 / fps;
     const totalFrames = Math.floor(slideDuration / frameDelay);
 
-    // 1. Hold on Image A
     drawFrame(imgA, null);
     gif.addFrame(ctx, { copy: true, delay: options.delay });
 
-    // 2. Sliding Animation
     for (let i = 0; i <= totalFrames; i++) {
       const progress = i / totalFrames;
       drawFrame(null, progress);
       gif.addFrame(ctx, { copy: true, delay: frameDelay });
     }
 
-    // 3. Hold on Image B
     drawFrame(imgB, null);
     gif.addFrame(ctx, { copy: true, delay: options.delay });
   }
@@ -270,7 +260,6 @@ export const generateGif = async (
     });
 
     gif.on('finished', (blob: Blob) => {
-      // Cleanup
       URL.revokeObjectURL(workerScriptUrl);
       resolve(blob);
     });

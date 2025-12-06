@@ -3,15 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DiffGIF - Create Comparison GIFs</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load GIF.js library from CDN (Global Scope) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+    <title>DiffGIF - Professional Image Comparison</title>
+    <meta name="description" content="Create professional before/after comparison GIFs with branding." />
     
-    <!-- Preconnect to CDNs for faster loading -->
-    <link rel="preconnect" href="https://esm.sh" />
-    <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
-
+    <!-- Load Tailwind via CDN for simplicity in this setup -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         theme: {
@@ -34,43 +30,28 @@
         }
       }
     </script>
+
+    <!-- Load GIF.js (Legacy Library) from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
       body {
         font-family: 'Inter', sans-serif;
-        background-color: #0f172a; /* Slate 900 */
+        background-color: #0f172a;
         color: #f8fafc;
         margin: 0;
       }
-      /* Custom scrollbar */
-      ::-webkit-scrollbar {
-        width: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #1e293b; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #475569; 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #64748b; 
-      }
-
-      /* Loading Spinner Styles */
       .initial-loader {
         position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background-color: #0f172a;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: #0f172a;
+        z-index: 9999;
         display: flex;
         flex-direction: column;
-        justify-content: center;
         align-items: center;
-        z-index: 9999;
-        transition: opacity 0.5s ease-out;
+        justify-content: center;
+        transition: opacity 0.5s;
       }
       .spinner {
         width: 40px;
@@ -80,88 +61,28 @@
         border-radius: 50%;
         animation: spin 1s linear infinite;
       }
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-      .error-message {
-        color: #ef4444;
-        background: rgba(239, 68, 68, 0.1);
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin-top: 1rem;
-        max-width: 80%;
-        text-align: center;
-        font-family: monospace;
-        display: none;
-      }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
-    
-    <!-- 
-      FIXED IMPORTMAP:
-      Strictly uses esm.sh public CDN. 
-      All internal/private domains have been REMOVED.
-      Using ?dev to ensure robust resolution and error messaging.
-    -->
-    <script type="importmap">
+  <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@18.3.1?dev",
-    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime?dev",
-    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client?dev&deps=react@18.3.1",
-    "react-dom": "https://esm.sh/react-dom@18.3.1?dev&deps=react@18.3.1",
-    "lucide-react": "https://esm.sh/lucide-react@0.344.0?dev&deps=react@18.3.1",
+    "react": "https://aistudiocdn.com/react@^19.2.1",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "react/": "https://aistudiocdn.com/react@^19.2.1/"
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
+    "vite": "https://aistudiocdn.com/vite@^7.2.6",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1"
   }
 }
 </script>
-  </head>
+</head>
   <body>
     <div id="root">
-      <!-- Initial Loading State -->
       <div id="loader" class="initial-loader">
         <div class="spinner"></div>
-        <p style="margin-top: 16px; color: #64748b; font-size: 0.875rem;">Loading DiffGIF...</p>
-        <div id="error-display" class="error-message"></div>
+        <p style="margin-top:1rem;color:#64748b;font-size:0.875rem">Initializing Studio...</p>
       </div>
     </div>
-
-    <!-- Fallback: If app doesn't load in 5 seconds, show error -->
-    <script>
-      window.addEventListener('error', function(event) {
-        const loader = document.getElementById('loader');
-        const errorDisplay = document.getElementById('error-display');
-        const spinner = loader ? loader.querySelector('.spinner') : null;
-        if (loader && errorDisplay) {
-          if (spinner) spinner.style.display = 'none';
-          errorDisplay.style.display = 'block';
-          // Filter out noisy extension errors
-          if (!event.message.includes('extension')) {
-             errorDisplay.innerText = 'System Error: ' + event.message;
-          }
-        }
-      });
-
-      setTimeout(() => {
-        const loader = document.getElementById('loader');
-        if (loader && loader.style.opacity !== '0') {
-           // Check if root is empty (meaning React didn't render)
-           const root = document.getElementById('root');
-           if (root && root.children.length <= 1) { // 1 because loader is inside root
-             const errorDisplay = document.getElementById('error-display');
-             const spinner = loader.querySelector('.spinner');
-             if (spinner) spinner.style.display = 'none';
-             if (errorDisplay) {
-                errorDisplay.style.display = 'block';
-                errorDisplay.innerText = 'Application timed out. Please refresh or check console.';
-             }
-           }
-        }
-      }, 8000);
-    </script>
-    
-    <!-- Explicitly load the entry point module -->
-    <script type="module" src="./index.tsx"></script>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
