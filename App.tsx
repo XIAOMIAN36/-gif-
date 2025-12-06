@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Download, Sparkles, RefreshCw, Layers, Zap, Clock, Image as ImageIcon, Settings, ScanLine, Eye, Monitor, Gauge, Feather, Film, Crop, FileDigit } from 'lucide-react';
+import { Download, Sparkles, Layers, Zap, Clock, Image as ImageIcon, Settings, ScanLine, Eye, Monitor, Feather, Film, Crop, FileDigit } from 'lucide-react';
 import { Dropzone } from './components/Dropzone';
 import { generateGif } from './utils/gifGenerator';
 import { ImageFile, GifOptions } from './types';
@@ -403,13 +403,7 @@ function App() {
 
         {/* SECTION 2: Poster Editor (ALWAYS VISIBLE) */}
         <div className="animate-in fade-in slide-in-from-bottom-12 duration-700 delay-100">
-           <React.Suspense fallback={
-             <div className="w-full h-64 bg-slate-900 rounded-2xl flex items-center justify-center text-slate-500">
-               Loading Studio...
-             </div>
-           }>
              <PosterEditor imgA={imgA} imgB={imgB} baseOptions={options} />
-           </React.Suspense>
         </div>
       </main>
     </div>

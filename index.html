@@ -101,16 +101,16 @@
       FIXED IMPORTMAP:
       Strictly uses esm.sh public CDN. 
       All internal/private domains have been REMOVED.
-      All dependencies are pinned to share react@18.3.1.
+      Using ?dev to ensure robust resolution and error messaging.
     -->
     <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@18.3.1",
-    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
-    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client?deps=react@18.3.1",
-    "react-dom": "https://esm.sh/react-dom@18.3.1?deps=react@18.3.1",
-    "lucide-react": "https://esm.sh/lucide-react@0.344.0?deps=react@18.3.1",
+    "react": "https://esm.sh/react@18.3.1?dev",
+    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime?dev",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client?dev&deps=react@18.3.1",
+    "react-dom": "https://esm.sh/react-dom@18.3.1?dev&deps=react@18.3.1",
+    "lucide-react": "https://esm.sh/lucide-react@0.344.0?dev&deps=react@18.3.1",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
     "react/": "https://aistudiocdn.com/react@^19.2.1/"
   }
@@ -132,9 +132,9 @@
       window.addEventListener('error', function(event) {
         const loader = document.getElementById('loader');
         const errorDisplay = document.getElementById('error-display');
-        const spinner = loader.querySelector('.spinner');
+        const spinner = loader ? loader.querySelector('.spinner') : null;
         if (loader && errorDisplay) {
-          spinner.style.display = 'none';
+          if (spinner) spinner.style.display = 'none';
           errorDisplay.style.display = 'block';
           // Filter out noisy extension errors
           if (!event.message.includes('extension')) {
@@ -154,11 +154,11 @@
              if (spinner) spinner.style.display = 'none';
              if (errorDisplay) {
                 errorDisplay.style.display = 'block';
-                errorDisplay.innerText = 'Application timed out. Check console for details.';
+                errorDisplay.innerText = 'Application timed out. Please refresh or check console.';
              }
            }
         }
-      }, 6000);
+      }, 8000);
     </script>
     
     <!-- Explicitly load the entry point module -->

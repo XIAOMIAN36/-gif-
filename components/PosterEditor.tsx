@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Download, Type, Palette, LayoutTemplate, Zap, FileDigit, MousePointer2, Move, Crop, Type as TypeIcon } from 'lucide-react';
 import { ImageFile, GifOptions, PosterConfig, ElementPosition } from '../types';
