@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { Download, Sparkles, RefreshCw, Layers, Zap, Clock, Image as ImageIcon, Settings, ScanLine, Eye, Monitor, Gauge, Feather, Film, Crop, FileDigit } from 'lucide-react';
 import { Dropzone } from './components/Dropzone';
@@ -65,7 +64,7 @@ function App() {
 
     } catch (error) {
       console.error('Error generating GIF:', error);
-      alert('Failed to generate GIF. Please ensure images are valid.');
+      alert('Failed to generate GIF. ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setGenerating(false);
     }
@@ -95,7 +94,7 @@ function App() {
             </h1>
           </div>
           <div className="text-xs font-mono text-slate-500 border border-slate-800 rounded px-2 py-1">
-             v3.6 Pro
+             v3.7 Stable
           </div>
         </div>
       </header>
@@ -404,7 +403,13 @@ function App() {
 
         {/* SECTION 2: Poster Editor (ALWAYS VISIBLE) */}
         <div className="animate-in fade-in slide-in-from-bottom-12 duration-700 delay-100">
-           <PosterEditor imgA={imgA} imgB={imgB} baseOptions={options} />
+           <React.Suspense fallback={
+             <div className="w-full h-64 bg-slate-900 rounded-2xl flex items-center justify-center text-slate-500">
+               Loading Studio...
+             </div>
+           }>
+             <PosterEditor imgA={imgA} imgB={imgB} baseOptions={options} />
+           </React.Suspense>
         </div>
       </main>
     </div>

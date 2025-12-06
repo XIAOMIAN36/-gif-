@@ -1,4 +1,3 @@
-
 import { GifOptions, PosterConfig } from '../types';
 
 // Helper to load an image from a URL into an HTMLImageElement
@@ -12,17 +11,20 @@ const loadImage = (url: string): Promise<HTMLImageElement> => {
   });
 };
 
-// Helper to fetch the worker script blob to avoid CORS issues
-const getWorkerBlobUrl = async (): Promise<string> => {
-  try {
-    const response = await fetch('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js');
-    if (!response.ok) throw new Error('Failed to fetch worker');
-    const blob = await response.blob();
-    return URL.createObjectURL(blob);
-  } catch (error) {
-    console.error("Could not load GIF worker locally", error);
-    return 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js';
-  }
+// Helper to create a Worker Blob URL that works across domains (CORS Fix)
+const getWorkerBlobUrl = (): string => {
+  // We create a tiny worker script that imports the actual logic from CDN.
+  // This bypasses some CORS restrictions on fetching the file directly, 
+  // relying instead on the browser's ability to importScripts.
+  const workerCode = `
+    try {
+      importScripts('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js');
+    } catch (e) {
+      console.error('Worker failed to load script', e);
+    }
+  `;
+  const blob = new Blob([workerCode], { type: 'application/javascript' });
+  return URL.createObjectURL(blob);
 };
 
 /**
@@ -146,10 +148,15 @@ export const generateGif = async (
   };
 
   // --- 4. Setup GIF Encoder ---
-  const workerScriptUrl = await getWorkerBlobUrl();
+  const workerScriptUrl = getWorkerBlobUrl();
   const concurrency = navigator.hardwareConcurrency || 4;
   
-  const gif = new GIF({
+  // Check if GIF library is loaded
+  if (typeof (window as any).GIF === 'undefined') {
+    throw new Error('GIF library not loaded. Please refresh the page.');
+  }
+
+  const gif = new (window as any).GIF({
     workers: Math.min(concurrency, 8),
     quality: options.quality,
     width: canvasWidth,
@@ -166,6 +173,9 @@ export const generateGif = async (
       // 1. Draw Background (Color)
       if (options.poster?.enabled) {
          ctx.fillStyle = options.poster.backgroundColor;
+         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+      } else {
+         ctx.fillStyle = '#000000'; // Default BG
          ctx.fillRect(0, 0, canvasWidth, canvasHeight);
       }
 
@@ -260,17 +270,20 @@ export const generateGif = async (
     });
 
     gif.on('finished', (blob: Blob) => {
+      // Cleanup
       URL.revokeObjectURL(workerScriptUrl);
       resolve(blob);
     });
 
     gif.on('abort', () => {
+       URL.revokeObjectURL(workerScriptUrl);
       reject(new Error('GIF generation aborted'));
     });
 
     try {
       gif.render();
     } catch (err) {
+      URL.revokeObjectURL(workerScriptUrl);
       reject(err);
     }
   });
