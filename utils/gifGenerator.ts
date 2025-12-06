@@ -148,14 +148,14 @@ export const generateGif = async (
   };
 
   // --- 4. Setup GIF Encoder ---
-  const workerScriptUrl = getWorkerBlobUrl();
-  const concurrency = navigator.hardwareConcurrency || 4;
-  
   // Check if GIF library is loaded
   if (typeof (window as any).GIF === 'undefined') {
     throw new Error('GIF library not loaded. Please refresh the page.');
   }
 
+  const workerScriptUrl = getWorkerBlobUrl();
+  const concurrency = navigator.hardwareConcurrency || 4;
+  
   const gif = new (window as any).GIF({
     workers: Math.min(concurrency, 8),
     quality: options.quality,

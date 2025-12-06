@@ -84,13 +84,24 @@
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
       }
+      .error-message {
+        color: #ef4444;
+        background: rgba(239, 68, 68, 0.1);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-top: 1rem;
+        max-width: 80%;
+        text-align: center;
+        font-family: monospace;
+        display: none;
+      }
     </style>
     
     <!-- 
-      CRITICAL FIX: 
-      Strictly use React 18.3.1 from esm.sh.
-      REMOVED conflicting aistudiocdn lines that pointed to React 19.
-      Added react/jsx-runtime mapping to ensure compiler uses correct version.
+      FIXED IMPORTMAP:
+      1. Strictly versioned to React 18.3.1 via esm.sh
+      2. deps=react@18.3.1 ensures shared instance
+      3. REMOVED all internal test domain links
     -->
     <script type="importmap">
 {
@@ -109,11 +120,26 @@
   <body>
     <div id="root">
       <!-- Initial Loading State -->
-      <div class="initial-loader">
+      <div id="loader" class="initial-loader">
         <div class="spinner"></div>
         <p style="margin-top: 16px; color: #64748b; font-size: 0.875rem;">Loading DiffGIF...</p>
+        <div id="error-display" class="error-message"></div>
       </div>
     </div>
+
+    <!-- Error Handler Script -->
+    <script>
+      window.addEventListener('error', function(event) {
+        const loader = document.getElementById('loader');
+        const errorDisplay = document.getElementById('error-display');
+        const spinner = loader.querySelector('.spinner');
+        if (loader && errorDisplay) {
+          spinner.style.display = 'none';
+          errorDisplay.style.display = 'block';
+          errorDisplay.innerText = 'Application Error: ' + event.message + '\n\nPlease try refreshing the page.';
+        }
+      });
+    </script>
     
     <!-- Explicitly load the entry point module -->
     <script type="module" src="./index.tsx"></script>
