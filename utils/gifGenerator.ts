@@ -66,6 +66,11 @@ export const generateGif = async (
 ): Promise<Blob> => {
   const [imgA, imgB] = await Promise.all([loadImage(imageAUrl), loadImage(imageBUrl)]);
 
+  // Check if GIF library is loaded
+  if (typeof (window as any).GIF === 'undefined') {
+    throw new Error('GIF library not loaded. Please refresh the page.');
+  }
+
   // --- 1. Determine Output Canvas Size ---
   let canvasWidth = 1080; // Base resolution
   let canvasHeight = 1080;
@@ -148,11 +153,6 @@ export const generateGif = async (
   };
 
   // --- 4. Setup GIF Encoder ---
-  // Check if GIF library is loaded
-  if (typeof (window as any).GIF === 'undefined') {
-    throw new Error('GIF library not loaded. Please refresh the page.');
-  }
-
   const workerScriptUrl = getWorkerBlobUrl();
   const concurrency = navigator.hardwareConcurrency || 4;
   

@@ -99,9 +99,8 @@
     
     <!-- 
       FIXED IMPORTMAP:
-      1. Strictly versioned to React 18.3.1 via esm.sh
-      2. deps=react@18.3.1 ensures shared instance
-      3. REMOVED all internal test domain links
+      Strictly uses esm.sh public CDN. 
+      All internal/private domains have been removed.
     -->
     <script type="importmap">
 {
@@ -127,7 +126,7 @@
       </div>
     </div>
 
-    <!-- Error Handler Script -->
+    <!-- Fallback: If app doesn't load in 5 seconds, show error -->
     <script>
       window.addEventListener('error', function(event) {
         const loader = document.getElementById('loader');
@@ -136,9 +135,26 @@
         if (loader && errorDisplay) {
           spinner.style.display = 'none';
           errorDisplay.style.display = 'block';
-          errorDisplay.innerText = 'Application Error: ' + event.message + '\n\nPlease try refreshing the page.';
+          errorDisplay.innerText = 'Error: ' + event.message;
         }
       });
+
+      setTimeout(() => {
+        const loader = document.getElementById('loader');
+        if (loader && loader.style.opacity !== '0') {
+           // Check if root is empty (meaning React didn't render)
+           const root = document.getElementById('root');
+           if (root && root.children.length <= 1) { // 1 because loader is inside root
+             const errorDisplay = document.getElementById('error-display');
+             const spinner = loader.querySelector('.spinner');
+             if (spinner) spinner.style.display = 'none';
+             if (errorDisplay) {
+                errorDisplay.style.display = 'block';
+                errorDisplay.innerText = 'Application timeout. Please check console for details.';
+             }
+           }
+        }
+      }, 8000);
     </script>
     
     <!-- Explicitly load the entry point module -->
