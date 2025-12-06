@@ -1,0 +1,5 @@
+{
+  "name": "DiffGIF - Image Comparison Tool",
+  "description": "Instantly create blinking comparison GIFs from two images. Upload 'Before' and 'After' shots to generate a smooth, animated comparison file.",
+  "requestFramePermissions": []
+}
