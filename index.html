@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DiffGIF - Professional Image Comparison</title>
+    <meta name="description" content="Create professional before/after comparison GIFs with branding.">
     
     <!-- 1. Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -23,32 +24,32 @@
       }
     </script>
 
-    <!-- 2. GIF.js -->
+    <!-- 2. GIF.js (Core Library) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
 
-    <!-- 3. Babel (Enables in-browser JSX/TS compilation) -->
+    <!-- 3. Babel (Compiles React in Browser) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
       body { background-color: #0f172a; color: #f8fafc; margin: 0; font-family: 'Inter', sans-serif; }
-      .spinner { width: 40px; height: 40px; border: 4px solid #1e293b; border-top: 4px solid #38bdf8; border-radius: 50%; animation: spin 1s linear infinite; }
-      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
       
-      /* Scrollbar styling */
+      /* Custom Scrollbar */
       ::-webkit-scrollbar { width: 8px; height: 8px; }
       ::-webkit-scrollbar-track { background: #0f172a; }
       ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
       ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+      /* Loader Animation */
+      .spinner { width: 40px; height: 40px; border: 4px solid #1e293b; border-top: 4px solid #38bdf8; border-radius: 50%; animation: spin 1s linear infinite; }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 <script type="importmap">
 {
   "imports": {
     "react": "https://aistudiocdn.com/react@^19.2.1",
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.1/",
-    "vite": "https://aistudiocdn.com/vite@^7.2.6",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1"
+    "react/": "https://aistudiocdn.com/react@^19.2.1/"
   }
 }
 </script>
@@ -57,12 +58,12 @@
     <div id="root">
         <div style="height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;">
             <div class="spinner"></div>
-            <p style="margin-top:1rem;color:#64748b;">Initializing DiffGIF Studio...</p>
+            <p style="margin-top:1rem;color:#64748b;">Loading DiffGIF Studio...</p>
         </div>
     </div>
 
-    <!-- 4. Core Application Logic -->
-    <script type="text/babel" data-type="module" data-presets="react,typescript">
+    <!-- 4. MAIN APPLICATION SCRIPT -->
+    <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef, useCallback } from 'https://esm.sh/react@18.2.0';
         import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
         import { 
@@ -71,47 +72,12 @@
           Type, Palette, LayoutTemplate, MousePointer2, Move, Camera, Gauge, SlidersHorizontal
         } from 'https://esm.sh/lucide-react@0.263.1';
 
-        // --- GIF Worker Hack (Fixes Vercel/Cross-Origin Issues) ---
+        // --- 1. WORKER HACK (CRITICAL FOR VERCEL/STATIC HOSTING) ---
+        // This creates a local Blob URL for the worker script so we don't need to host a separate file.
         const workerBlob = new Blob([`importScripts('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js')`], { type: 'application/javascript' });
         const workerUrl = window.URL.createObjectURL(workerBlob);
 
-        // --- Types & Interfaces ---
-        
-        type AnimationMode = 'blink' | 'slider';
-        interface ElementPosition { x: number; y: number; }
-        interface PosterConfig {
-          enabled: boolean;
-          title: string;
-          subtitle: string;
-          backgroundColor: string;
-          textColor: string;
-          fontFamily: string;
-          titleFontSize: number;
-          subtitleFontSize: number;
-          posterAspectRatio: '1:1' | '9:16' | '16:9' | '4:5' | '3:4' | '4:3' | '21:9';
-          titlePos: ElementPosition;
-          subtitlePos: ElementPosition;
-          imagePos: ElementPosition;
-          imageScale: number;
-        }
-        interface GifOptions {
-          mode: AnimationMode;
-          delay: number;
-          quality: number;
-          fps: number;
-          widthType: 'original' | '1920' | '1280' | '854';
-          aspectRatio: 'original' | '16:9' | '21:9' | '4:3' | '1:1' | '3:4' | '4:5' | '9:16';
-          poster?: PosterConfig;
-        }
-        interface ImageFile {
-          id: string;
-          file: File;
-          previewUrl: string;
-          width: number;
-          height: number;
-        }
-
-        // --- Utils: GIF Generator ---
+        // --- 2. UTILITY FUNCTIONS ---
 
         const loadImage = (url) => {
           return new Promise((resolve, reject) => {
@@ -142,6 +108,7 @@
           ctx.restore();
         };
 
+        // --- 3. GIF GENERATION ENGINE ---
         const generateGif = async (imageAUrl, imageBUrl, options, onProgress) => {
           if (typeof window.GIF === 'undefined') {
             throw new Error('GIF.js library is missing.');
@@ -149,7 +116,7 @@
 
           const [imgA, imgB] = await Promise.all([loadImage(imageAUrl), loadImage(imageBUrl)]);
 
-          // 1. Setup Dimensions
+          // Determine Dimensions
           let canvasWidth = 1080;
           let canvasHeight = 1080;
 
@@ -169,7 +136,7 @@
             canvasHeight = Math.round(canvasWidth / targetRatio);
           }
 
-          // 2. Content Box
+          // Content Box Logic
           let contentWidth = canvasWidth;
           let contentHeight = canvasHeight;
           let contentX = 0;
@@ -184,13 +151,15 @@
 
           if (options.poster && options.poster.enabled) {
              const scale = options.poster.imageScale;
-             contentWidth = contentWidth * scale;
-             contentHeight = contentHeight * scale;
-             contentX = (canvasWidth * options.poster.imagePos.x) - (contentWidth / 2);
-             contentY = (canvasHeight * options.poster.imagePos.y) - (contentHeight / 2);
+             // Calculate centered scaled box
+             const scaledW = contentWidth * scale;
+             const scaledH = contentHeight * scale;
+             contentX = (canvasWidth * options.poster.imagePos.x) - (scaledW / 2);
+             contentY = (canvasHeight * options.poster.imagePos.y) - (scaledH / 2);
+             contentWidth = scaledW;
+             contentHeight = scaledH;
           }
 
-          // 3. Canvas
           const canvas = document.createElement('canvas');
           canvas.width = canvasWidth;
           canvas.height = canvasHeight;
@@ -200,23 +169,23 @@
             drawImageCover(ctx, img, contentX, contentY, contentWidth, contentHeight);
           };
 
-          // 4. GIF Encoder
+          // Initialize GIF.js
           const gif = new window.GIF({
             workers: 4,
-            quality: options.quality,
+            quality: options.quality, // 1 is best, 30 is worst
             width: canvasWidth,
             height: canvasHeight,
-            workerScript: workerUrl,
+            workerScript: workerUrl, // Use our Blob URL
             background: options.poster?.enabled ? options.poster.backgroundColor : '#000000',
           });
 
-          // 5. Draw Frame Logic
+          // Draw Frame Logic
           const drawFrame = (imgToDraw, splitProgress) => {
-              // Background
+              // 1. BG
               ctx.fillStyle = options.poster?.enabled ? options.poster.backgroundColor : '#000000';
               ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-              // Image
+              // 2. Image
               if (splitProgress === null) {
                  if (imgToDraw) drawContent(imgToDraw);
               } else {
@@ -235,7 +204,7 @@
                  }
               }
 
-              // Text
+              // 3. Text Overlay
               if (options.poster?.enabled) {
                   const config = options.poster;
                   const scaleFactor = canvasWidth / 1080;
@@ -258,6 +227,7 @@
               }
           };
 
+          // Render Loop
           if (options.mode === 'blink') {
             drawFrame(imgA, null);
             gif.addFrame(ctx, { copy: true, delay: options.delay });
@@ -284,7 +254,7 @@
           });
         };
 
-        // --- Component: Dropzone ---
+        // --- 4. COMPONENTS ---
 
         const Dropzone = ({ label, image, onImageSelect, onRemove, colorClass }) => {
           const inputRef = useRef(null);
@@ -337,8 +307,6 @@
           );
         };
 
-        // --- Component: PosterEditor ---
-
         const PosterEditor = ({ imgA, imgB, baseOptions }) => {
           const [config, setConfig] = useState({
             enabled: true,
@@ -372,11 +340,11 @@
             { value: 'cursive', label: 'Handwriting' }
           ];
 
+          // Preview Render
           const renderPreview = async () => {
             const canvas = previewCanvasRef.current;
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
-            
             const previewWidth = 600;
             const [rw, rh] = config.posterAspectRatio.split(':').map(Number);
             canvas.width = previewWidth;
@@ -385,14 +353,18 @@
             ctx.fillStyle = config.backgroundColor;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw Image Mockup
+            // Mockup Image
             if (imgA) {
                const img = new Image();
                img.crossOrigin = 'anonymous';
                img.src = imgA.previewUrl;
-               // In a real app we'd wait for load, here we assume cached or fast enough for loop
                if (img.complete) {
-                  const animRatio = (baseOptions.aspectRatio !== 'original') ? (baseOptions.aspectRatio.split(':').map(Number).reduce((a,b)=>a/b)) : (img.naturalWidth/img.naturalHeight);
+                  let animRatio = img.naturalWidth / img.naturalHeight;
+                  if (baseOptions.aspectRatio !== 'original') {
+                     const [w, h] = baseOptions.aspectRatio.split(':').map(Number);
+                     animRatio = w/h;
+                  }
+                  
                   const scaledW = previewWidth * config.imageScale;
                   const scaledH = (previewWidth / animRatio) * config.imageScale;
                   const dx = (canvas.width * config.imagePos.x) - (scaledW/2);
@@ -411,37 +383,23 @@
                }
             }
 
+            // Text
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = config.textColor;
             const scale = canvas.width / 1080;
             
             if (config.title) {
                 ctx.font = `bold ${Math.round(config.titleFontSize * scale)}px ${config.fontFamily}`;
-                const tx = canvas.width * config.titlePos.x;
-                const ty = canvas.height * config.titlePos.y;
-                ctx.fillText(config.title, tx, ty);
-                
-                if (draggingItem === 'title' || isHovering === 'title') {
-                    const m = ctx.measureText(config.title);
-                    ctx.strokeStyle = '#ec4899'; ctx.lineWidth = 1;
-                    ctx.strokeRect(tx - m.width/2 - 5, ty - (config.titleFontSize*scale)/2, m.width + 10, config.titleFontSize*scale);
-                }
+                ctx.fillText(config.title, canvas.width * config.titlePos.x, canvas.height * config.titlePos.y);
             }
             if (config.subtitle) {
                 ctx.font = `${Math.round(config.subtitleFontSize * scale)}px ${config.fontFamily}`;
-                const sx = canvas.width * config.subtitlePos.x;
-                const sy = canvas.height * config.subtitlePos.y;
-                ctx.fillText(config.subtitle, sx, sy);
-
-                if (draggingItem === 'subtitle' || isHovering === 'subtitle') {
-                    const m = ctx.measureText(config.subtitle);
-                    ctx.strokeStyle = '#ec4899'; ctx.lineWidth = 1;
-                    ctx.strokeRect(sx - m.width/2 - 5, sy - (config.subtitleFontSize*scale)/2, m.width + 10, config.subtitleFontSize*scale);
-                }
+                ctx.fillText(config.subtitle, canvas.width * config.subtitlePos.x, canvas.height * config.subtitlePos.y);
             }
           };
 
           useEffect(() => { renderPreview(); }, [config, imgA, baseOptions.aspectRatio, draggingItem, isHovering]);
 
+          // Drag Logic
           const getMousePos = (e) => {
               const rect = previewCanvasRef.current.getBoundingClientRect();
               return { x: e.clientX - rect.left, y: e.clientY - rect.top, w: rect.width, h: rect.height };
@@ -458,7 +416,6 @@
           const handleMouseMove = (e) => {
               const { x, y, w, h } = getMousePos(e);
               const nx = x/w, ny = y/h;
-              
               if (draggingItem) {
                 const newPos = { x: Math.max(0, Math.min(1, nx)), y: Math.max(0, Math.min(1, ny)) };
                 if (draggingItem === 'title') setConfig(c => ({...c, titlePos: newPos}));
@@ -477,7 +434,6 @@
              if (!imgA || !imgB) return;
              setGenerating(true); setProgress(0); setPosterUrl(null); setFileSize(null);
              try {
-                // Wait briefly to let React render loader state
                 await new Promise(r => setTimeout(r, 50));
                 const blob = await generateGif(imgA.previewUrl, imgB.previewUrl, { ...baseOptions, poster: config }, setProgress);
                 setPosterUrl(URL.createObjectURL(blob));
@@ -494,14 +450,12 @@
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                  <div className="lg:col-span-4 space-y-6">
-                    {/* Text Inputs */}
+                    {/* Controls */}
                     <div className="space-y-3">
                         <label className="text-xs text-slate-400 font-bold flex items-center gap-2"><Type size={14}/> TEXT</label>
                         <input type="text" value={config.title} onChange={e => setConfig({...config, title: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white" placeholder="Title" />
                         <input type="text" value={config.subtitle} onChange={e => setConfig({...config, subtitle: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white" placeholder="Subtitle" />
                     </div>
-
-                    {/* Style Controls */}
                     <div className="space-y-3">
                         <label className="text-xs text-slate-400 font-bold flex items-center gap-2"><Palette size={14}/> STYLE</label>
                         <div className="grid grid-cols-2 gap-2">
@@ -522,8 +476,6 @@
                             <div className="flex items-center gap-2"><span className="text-[10px] text-slate-500 w-12">Sub Size</span><input type="range" min="10" max="100" value={config.subtitleFontSize} onChange={(e) => setConfig({...config, subtitleFontSize: Number(e.target.value)})} className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-pink-500"/></div>
                         </div>
                     </div>
-                    
-                    {/* Layout Controls */}
                     <div className="space-y-3">
                         <label className="text-xs text-slate-400 font-bold flex items-center gap-2"><Crop size={14}/> LAYOUT</label>
                         <div className="flex gap-1 flex-wrap">
@@ -539,7 +491,7 @@
                  
                  <div className="lg:col-span-8 bg-slate-950/50 rounded-xl border border-slate-800 p-4 flex flex-col items-center justify-center min-h-[500px] relative">
                     {posterUrl ? (
-                        <div className="flex flex-col items-center gap-4 w-full">
+                        <div className="flex flex-col items-center gap-4 w-full animate-in fade-in">
                             <img src={posterUrl} className="max-w-full max-h-[60vh] object-contain shadow-xl border border-slate-800" />
                             <div className="flex items-center gap-4 w-full justify-center">
                                 {fileSize && <span className="text-sm font-mono text-pink-400 bg-slate-900 px-2 py-1 rounded border border-slate-800">{fileSize} MB</span>}
@@ -558,7 +510,7 @@
           );
         };
 
-        // --- Main Component: App ---
+        // --- 5. MAIN APP COMPONENT ---
 
         function App() {
           const [imgA, setImgA] = useState(null);
@@ -587,7 +539,6 @@
             if (!imgA || !imgB) return;
             setGenerating(true); setProgress(0); setGifUrl(null); setFileSize(null);
             try {
-              // Delay to let UI render loader
               await new Promise(r => setTimeout(r, 100));
               const blob = await generateGif(imgA.previewUrl, imgB.previewUrl, options, setProgress);
               setGifUrl(URL.createObjectURL(blob));
@@ -601,12 +552,13 @@
               <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
                 <div className="max-w-6xl mx-auto px-4 h-16 flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center text-white"><Layers size={18} /></div>
-                  <h1 className="text-xl font-bold">DiffGIF <span className="text-xs font-normal text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full ml-2">Studio</span></h1>
+                  <h1 className="text-xl font-bold">DiffGIF <span className="text-xs font-normal text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full ml-2">Lite</span></h1>
                 </div>
               </header>
 
               <main className="max-w-6xl mx-auto px-4 py-8 space-y-12">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                  {/* Left Column: Controls */}
                   <div className="lg:col-span-5 space-y-6">
                     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-5">
                        <h2 className="flex items-center gap-2 text-md font-semibold text-slate-200"><ImageIcon size={18} className="text-brand-400" /> Source Images</h2>
@@ -623,12 +575,12 @@
                       </div>
                       
                       <div className="space-y-4">
-                         {/* Basic Mode */}
+                         {/* Mode Selection */}
                          <div>
-                            <label className="text-xs text-slate-400 uppercase font-medium">Mode</label>
+                            <label className="text-xs text-slate-400 uppercase font-medium">Animation Mode</label>
                             <div className="grid grid-cols-2 gap-2 mt-1">
-                               <button onClick={() => setOptions(o => ({...o, mode: 'slider'}))} className={`py-2 rounded text-sm ${options.mode === 'slider' ? 'bg-slate-700 text-white' : 'text-slate-500 bg-slate-950 border border-slate-800'}`}>Slider</button>
-                               <button onClick={() => setOptions(o => ({...o, mode: 'blink'}))} className={`py-2 rounded text-sm ${options.mode === 'blink' ? 'bg-slate-700 text-white' : 'text-slate-500 bg-slate-950 border border-slate-800'}`}>Blink</button>
+                               <button onClick={() => setOptions(o => ({...o, mode: 'slider'}))} className={`py-2 rounded text-sm flex items-center justify-center gap-2 ${options.mode === 'slider' ? 'bg-slate-700 text-white' : 'text-slate-500 bg-slate-950 border border-slate-800'}`}><ScanLine size={14}/> Slider</button>
+                               <button onClick={() => setOptions(o => ({...o, mode: 'blink'}))} className={`py-2 rounded text-sm flex items-center justify-center gap-2 ${options.mode === 'blink' ? 'bg-slate-700 text-white' : 'text-slate-500 bg-slate-950 border border-slate-800'}`}><Eye size={14}/> Blink</button>
                             </div>
                          </div>
                          <div>
@@ -636,30 +588,29 @@
                             <input type="range" min="200" max="3000" step="100" value={options.delay} onChange={(e) => setOptions(o => ({...o, delay: Number(e.target.value)}))} className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-500 mt-2" />
                          </div>
                          
-                         {/* Advanced Settings */}
+                         {/* Advanced Controls (FPS, Quality, Resolution) */}
                          {showAdvanced && (
                              <div className="animate-in fade-in slide-in-from-top-2 space-y-4 pt-4 border-t border-slate-800">
                                 <div>
                                     <label className="text-xs text-slate-400 uppercase font-medium flex justify-between"><span>Resolution</span></label>
                                     <div className="flex gap-2 mt-1">
                                         {[
-                                            {l: 'Original', v: 'original'}, {l: '1080p', v: '1080'}, {l: '720p', v: '720'}, {l: 'SD', v: '480'}
+                                            {l: 'Auto', v: 'original'}, {l: '1080p', v: '1080'}, {l: '720p', v: '720'}, {l: 'SD', v: '480'}
                                         ].map(opt => (
                                             <button key={opt.v} onClick={() => setOptions(o => ({...o, widthType: opt.v}))} className={`px-2 py-1 text-xs border rounded ${options.widthType === opt.v ? 'bg-brand-900 border-brand-500 text-brand-200' : 'border-slate-700 text-slate-400'}`}>{opt.l}</button>
                                         ))}
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-slate-400 uppercase font-medium flex justify-between"><span>Quality (Low = Better)</span> <span className="text-brand-400">{options.quality}</span></label>
+                                    <label className="text-xs text-slate-400 uppercase font-medium flex justify-between"><span>Quality (Lower = Better)</span> <span className="text-brand-400">{options.quality}</span></label>
                                     <input type="range" min="1" max="30" step="1" value={options.quality} onChange={(e) => setOptions(o => ({...o, quality: Number(e.target.value)}))} className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-500 mt-2" />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-slate-400 uppercase font-medium flex justify-between"><span>FPS</span> <span className="text-brand-400">{options.fps}</span></label>
-                                    <input type="range" min="10" max="50" step="5" value={options.fps} onChange={(e) => setOptions(o => ({...o, fps: Number(e.target.value)}))} className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-500 mt-2" />
+                                    <label className="text-xs text-slate-400 uppercase font-medium flex justify-between"><span>Frame Rate (FPS)</span> <span className="text-brand-400">{options.fps}</span></label>
+                                    <input type="range" min="10" max="60" step="5" value={options.fps} onChange={(e) => setOptions(o => ({...o, fps: Number(e.target.value)}))} className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-500 mt-2" />
                                 </div>
                              </div>
                          )}
-
                          <div>
                              <label className="text-xs text-slate-400 uppercase font-medium">Output Ratio</label>
                              <div className="flex gap-2 mt-1 flex-wrap">
@@ -676,10 +627,11 @@
                     </button>
                   </div>
 
+                  {/* Right Column: Preview */}
                   <div className="lg:col-span-7 flex flex-col gap-6">
                     <div className="flex-1 min-h-[500px] bg-slate-900 border border-slate-800 rounded-2xl p-2 shadow-2xl flex flex-col items-center justify-center relative overflow-hidden">
                        {gifUrl ? (
-                         <img src={gifUrl} alt="Result" className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-2xl" />
+                         <img src={gifUrl} alt="Result" className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-2xl animate-in fade-in" />
                        ) : (
                          <div className="text-center z-10 p-8 opacity-30"><Sparkles size={48} className="text-slate-600 mx-auto mb-4" /><p className="text-xl text-slate-400">Ready to generate</p></div>
                        )}
@@ -699,6 +651,7 @@
                   </div>
                 </div>
                 
+                {/* Poster Editor Section */}
                 <PosterEditor imgA={imgA} imgB={imgB} baseOptions={options} />
               </main>
             </div>
