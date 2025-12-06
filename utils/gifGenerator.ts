@@ -20,6 +20,7 @@ const loadImage = (url: string): Promise<HTMLImageElement> => {
  * We fetch the text content and create a local Blob URL instead.
  */
 const getWorkerBlobUrl = async (): Promise<string> => {
+  // Use the exact version matching the main script
   const workerUrl = 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js';
   
   try {
