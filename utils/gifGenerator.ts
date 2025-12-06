@@ -20,17 +20,18 @@ const loadImage = (url: string): Promise<HTMLImageElement> => {
  * We fetch the text content and create a local Blob URL instead.
  */
 const getWorkerBlobUrl = async (): Promise<string> => {
+  const workerUrl = 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js';
+  
   try {
-    const workerUrl = 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js';
     const response = await fetch(workerUrl);
-    if (!response.ok) throw new Error('Network response was not ok');
+    if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
     const workerCode = await response.text();
     const blob = new Blob([workerCode], { type: 'application/javascript' });
     return URL.createObjectURL(blob);
   } catch (e) {
     console.warn('Failed to fetch worker script for blob creation. Fallback to direct URL.', e);
     // Fallback: This might fail in strict CORS/CSP environments, but is the only option if fetch fails.
-    return 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js';
+    return workerUrl;
   }
 };
 
@@ -75,7 +76,7 @@ export const generateGif = async (
 ): Promise<Blob> => {
   // Check if GIF library is loaded (loaded via <script> tag in index.html)
   if (typeof window.GIF === 'undefined') {
-    throw new Error('GIF library not loaded. Please refresh the page.');
+    throw new Error('GIF.js library is missing. Please check your internet connection and reload.');
   }
 
   const [imgA, imgB] = await Promise.all([loadImage(imageAUrl), loadImage(imageBUrl)]);
