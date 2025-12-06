@@ -4,37 +4,33 @@ import { GifOptions, PosterConfig } from '../types';
 const loadImage = (url: string): Promise<HTMLImageElement> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    // 'anonymous' allows the image to be used in canvas toBlob/toDataURL without tainting the canvas
+    // providing the server sends proper CORS headers.
+    img.crossOrigin = 'anonymous'; 
     img.onload = () => resolve(img);
-    img.onerror = (e) => reject(e);
+    img.onerror = (e) => reject(new Error(`Failed to load image. Ensure the image URL allows CORS.`));
     img.src = url;
   });
 };
 
-// Helper to create a Worker Blob URL that works across domains (CORS Fix)
+/**
+ * Creates a Blob URL for the GIF worker code.
+ * This is necessary because loading a worker from a cross-origin CDN URL directly
+ * is often blocked by browser security policies.
+ * We fetch the text content and create a local Blob URL instead.
+ */
 const getWorkerBlobUrl = async (): Promise<string> => {
   try {
-    // Try fetching the worker script text directly to inline it.
-    // This solves issues where `importScripts` inside a blob worker (null origin)
-    // is blocked by CORS or strict security policies on some domains/local files.
-    const response = await fetch('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js');
+    const workerUrl = 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js';
+    const response = await fetch(workerUrl);
     if (!response.ok) throw new Error('Network response was not ok');
     const workerCode = await response.text();
     const blob = new Blob([workerCode], { type: 'application/javascript' });
     return URL.createObjectURL(blob);
   } catch (e) {
-    console.warn('Failed to fetch worker script, falling back to importScripts', e);
-    // Fallback: Create a tiny worker script that imports the logic from CDN.
-    // This is the traditional method but may fail in strict CORS/offline environments.
-    const workerCode = `
-      try {
-        importScripts('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js');
-      } catch (e) {
-        console.error('Worker failed to load script', e);
-      }
-    `;
-    const blob = new Blob([workerCode], { type: 'application/javascript' });
-    return URL.createObjectURL(blob);
+    console.warn('Failed to fetch worker script for blob creation. Fallback to direct URL.', e);
+    // Fallback: This might fail in strict CORS/CSP environments, but is the only option if fetch fails.
+    return 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js';
   }
 };
 
@@ -53,6 +49,8 @@ const drawImageCover = (
   const imgWidth = img.naturalWidth;
   const imgHeight = img.naturalHeight;
   
+  if (!imgWidth || !imgHeight) return;
+
   const scale = Math.max(width / imgWidth, height / imgHeight);
   
   const scaledWidth = imgWidth * scale;
@@ -75,12 +73,12 @@ export const generateGif = async (
   options: GifOptions,
   onProgress: (progress: number) => void
 ): Promise<Blob> => {
-  const [imgA, imgB] = await Promise.all([loadImage(imageAUrl), loadImage(imageBUrl)]);
-
-  // Check if GIF library is loaded
+  // Check if GIF library is loaded (loaded via <script> tag in index.html)
   if (typeof window.GIF === 'undefined') {
     throw new Error('GIF library not loaded. Please refresh the page.');
   }
+
+  const [imgA, imgB] = await Promise.all([loadImage(imageAUrl), loadImage(imageBUrl)]);
 
   // --- 1. Determine Output Canvas Size ---
   let canvasWidth = 1080; // Base resolution
@@ -96,8 +94,8 @@ export const generateGif = async (
     canvasHeight = Math.round(canvasWidth * (h / w));
   } else {
     // Standard Mode: Driven by Image/Option Ratio
-    const originalWidth = imgA.naturalWidth;
-    const originalHeight = imgA.naturalHeight;
+    const originalWidth = imgA.naturalWidth || 1080;
+    const originalHeight = imgA.naturalHeight || 1080;
     
     let targetRatio = originalWidth / originalHeight;
     if (options.aspectRatio !== 'original') {
@@ -114,18 +112,16 @@ export const generateGif = async (
   }
 
   // --- 2. Calculate "Content Box" (The Animation Area) ---
-  // The animation itself might have a specific aspect ratio (e.g., 1:1 image inside 9:16 poster)
   let contentWidth = canvasWidth;
   let contentHeight = canvasHeight;
 
-  // Determine the shape of the animation frame
-  let animTargetRatio = imgA.naturalWidth / imgA.naturalHeight;
+  // Determine the shape of the animation frame inside the poster/canvas
+  let animTargetRatio = (imgA.naturalWidth || 1) / (imgA.naturalHeight || 1);
   if (options.aspectRatio !== 'original') {
     const [w, h] = options.aspectRatio.split(':').map(Number);
     animTargetRatio = w / h;
   }
   
-  // Calculate raw content dimensions before scaling/positioning
   contentHeight = contentWidth / animTargetRatio;
 
   // Apply Poster Scaling and Positioning
@@ -143,13 +139,7 @@ export const generateGif = async (
      
      contentWidth = scaledW;
      contentHeight = scaledH;
-  } else {
-     // Center vertically if ratios mismatch in standard mode
-     if (contentHeight > canvasHeight) {
-       // Optional: fit logic
-     }
   }
-
 
   // --- 3. Setup Canvas ---
   const canvas = document.createElement('canvas');
@@ -165,7 +155,15 @@ export const generateGif = async (
 
   // --- 4. Setup GIF Encoder ---
   // Await the worker blob creation
-  const workerScriptUrl = await getWorkerBlobUrl();
+  let workerScriptUrl = '';
+  try {
+    workerScriptUrl = await getWorkerBlobUrl();
+  } catch (e) {
+    console.error("Worker blob failed", e);
+    // Last resort fallback
+    workerScriptUrl = 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js';
+  }
+
   const concurrency = navigator.hardwareConcurrency || 4;
   
   const gif = new window.GIF({
@@ -180,13 +178,8 @@ export const generateGif = async (
   // --- 5. Generate Frames ---
   const drawFrame = (imgToDraw: HTMLImageElement | null, splitProgress: number | null) => {
       // 1. Draw Background (Color)
-      if (options.poster?.enabled) {
-         ctx.fillStyle = options.poster.backgroundColor;
-         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-      } else {
-         ctx.fillStyle = '#000000'; // Default BG
-         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-      }
+      ctx.fillStyle = options.poster?.enabled ? options.poster.backgroundColor : '#000000';
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
       // 2. Draw Image (The Animation)
       if (splitProgress === null) {
@@ -202,7 +195,8 @@ export const generateGif = async (
          
          ctx.save();
          ctx.beginPath();
-         ctx.rect(contentX, contentY, contentWidth * splitProgress, contentHeight);
+         // Ensure clip rect is within content bounds
+         ctx.rect(contentX, contentY, Math.max(0, contentWidth * splitProgress), contentHeight);
          ctx.clip();
          drawContent(imgB);
          ctx.restore();
@@ -274,19 +268,25 @@ export const generateGif = async (
     });
 
     gif.on('finished', (blob: Blob) => {
-      URL.revokeObjectURL(workerScriptUrl);
+      if (workerScriptUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(workerScriptUrl);
+      }
       resolve(blob);
     });
 
     gif.on('abort', () => {
-       URL.revokeObjectURL(workerScriptUrl);
+       if (workerScriptUrl.startsWith('blob:')) {
+         URL.revokeObjectURL(workerScriptUrl);
+       }
       reject(new Error('GIF generation aborted'));
     });
 
     try {
       gif.render();
     } catch (err) {
-      URL.revokeObjectURL(workerScriptUrl);
+      if (workerScriptUrl.startsWith('blob:')) {
+         URL.revokeObjectURL(workerScriptUrl);
+       }
       reject(err);
     }
   });
